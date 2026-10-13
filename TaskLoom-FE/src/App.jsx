@@ -1,11 +1,31 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { api } from './api/client'
 import { selectCurrentUser, selectToken, selectAuthLoading, setUser, logout } from './features/auth/authSlice'
 import { applyTheme } from './app/theme'
 import { LoadingState } from './components/States'
 import Login from './pages/Login'
+import Register from './pages/Register'
+
+function RequireAuth() {
+  const user = useSelector(selectCurrentUser)
+  const location = useLocation()
+  if (!user) {
+    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />
+  }
+  return <Outlet />
+}
+
+function GuestOnly() {
+  const user = useSelector(selectCurrentUser)
+  const location = useLocation()
+  if (user) {
+    const next = new URLSearchParams(location.search).get('next')
+    return <Navigate to={next && next.startsWith('/') ? next : '/'} replace />
+  }
+  return <Outlet />
+}
 
 function App() {
   const dispatch = useDispatch()
@@ -32,7 +52,14 @@ function App() {
   return (
     <>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route element={<GuestOnly />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Route>
+
+        <Route element={<RequireAuth />}>
+          <Route path="/" element={<p>Welcome to Taskloom</p>} />
+        </Route>
       </Routes>
     </>
   )
