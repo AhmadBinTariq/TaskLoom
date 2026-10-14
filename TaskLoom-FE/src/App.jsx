@@ -5,6 +5,7 @@ import { api } from './api/client'
 import { selectCurrentUser, selectToken, selectAuthLoading, setUser, logout } from './features/auth/authSlice'
 import { applyTheme } from './app/theme'
 import { LoadingState } from './components/States'
+import AppLayout from './components/AppLayout'
 import Login from './pages/Login'
 import Register from './pages/Register'
 
@@ -58,7 +59,8 @@ function App() {
         </Route>
 
         <Route element={<RequireAuth />}>
-          <Route path="/" element={<p>Welcome to Taskloom</p>} />
+          <Route element={<AppLayout />}>
+          </Route>
         </Route>
       </Routes>
     </>
