@@ -35,4 +35,7 @@ export const api = {
     login: (body) => post('/auth/login', body),
     me: () => get('/auth/me').then(normUser),
   },
+  workspaces: {
+    list: () => get('/workspaces'),
+  },
 }

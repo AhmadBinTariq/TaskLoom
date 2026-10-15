@@ -27,6 +27,21 @@
   letter-spacing: 0.02em;
 }
 
+.app-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.app-section-label {
+  padding: 0 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
 .app-footer {
   margin-top: auto;
   display: flex;

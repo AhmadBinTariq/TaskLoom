@@ -1,5 +1,7 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { NavLink, Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
+import { api } from '../api/client'
 import { selectCurrentUser, logout } from '../features/auth/authSlice'
 import Avatar from './Avatar'
 import Icon from './Icon'
@@ -9,6 +11,17 @@ function AppLayout() {
   const user = useSelector(selectCurrentUser)
   const dispatch = useDispatch()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const match = useMatch('/w/:workspaceId/*')
+  const workspaceId = match?.params.workspaceId
+
+  const [workspaces, setWorkspaces] = useState([])
+  const inWorkspace = workspaceId && workspaces.some((w) => w.id === workspaceId)
+
+  useEffect(() => {
+    api.workspaces.list().then(setWorkspaces).catch(() => setWorkspaces([]))
+  }, [location.pathname])
 
   const handleLogout = () => {
     dispatch(logout())
@@ -20,6 +33,22 @@ function AppLayout() {
       <nav className="app-sidebar">
         <div className="app-brand-row">
           <span className="app-brand">Taskloom</span>
+        </div>
+
+        <div className="app-section">
+          <label htmlFor="ws-switch" className="app-section-label">Workspace</label>
+          <select
+            id="ws-switch"
+            className="input"
+            value={workspaceId ?? ''}
+            onChange={(e) => navigate(`/w/${e.target.value}`)}
+          >
+            {!workspaceId && <option value="">Select a workspace</option>}
+            {workspaces.map((w) => (
+              <option key={w.id} value={w.id}>{w.name}</option>
+            ))}
+            {workspaceId && !inWorkspace && <option value={workspaceId}>Unavailable workspace</option>}
+          </select>
         </div>
 
         <div className="app-footer">
