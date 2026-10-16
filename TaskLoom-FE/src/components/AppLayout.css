@@ -42,6 +42,39 @@
   color: var(--color-text-muted);
 }
 
+.app-nav,
+.app-projects {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-nav a,
+.app-projects a {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.app-nav a:hover,
+.app-projects a:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.app-nav a.is-active,
+.app-projects a.is-active {
+  background-color: var(--color-red-tint);
+  color: var(--color-text);
+  box-shadow: inset 3px 0 0 var(--color-red);
+}
+
 .app-footer {
   margin-top: auto;
   display: flex;

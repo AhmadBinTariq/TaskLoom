@@ -28,6 +28,8 @@ function AppLayout() {
     navigate('/login')
   }
 
+  const linkClass = ({ isActive }) => (isActive ? 'is-active' : undefined)
+
   return (
     <div className="app-shell">
       <nav className="app-sidebar">
@@ -50,6 +52,33 @@ function AppLayout() {
             {workspaceId && !inWorkspace && <option value={workspaceId}>Unavailable workspace</option>}
           </select>
         </div>
+
+        {inWorkspace && (
+          <>
+            <ul className="app-nav">
+              <li>
+                <NavLink end to={`/w/${workspaceId}`} className={linkClass}>
+                  <Icon name="folder" /> Projects
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to={`/w/${workspaceId}/search`} className={linkClass}>
+                  <Icon name="search" /> Search
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to={`/w/${workspaceId}/members`} className={linkClass}>
+                  <Icon name="users" /> Members
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to={`/w/${workspaceId}/settings`} className={linkClass}>
+                  <Icon name="settings" /> Workspace settings
+                </NavLink>
+              </li>
+            </ul>
+          </>
+        )}
 
         <div className="app-footer">
           <div className="app-user-row">
