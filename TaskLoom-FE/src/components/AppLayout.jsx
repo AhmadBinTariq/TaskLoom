@@ -17,11 +17,17 @@ function AppLayout() {
   const workspaceId = match?.params.workspaceId
 
   const [workspaces, setWorkspaces] = useState([])
+  const [projects, setProjects] = useState([])
   const inWorkspace = workspaceId && workspaces.some((w) => w.id === workspaceId)
 
   useEffect(() => {
     api.workspaces.list().then(setWorkspaces).catch(() => setWorkspaces([]))
   }, [location.pathname])
+
+  useEffect(() => {
+    if (workspaceId) api.projects.list(workspaceId).then(setProjects).catch(() => setProjects([]))
+    else setProjects([])
+  }, [workspaceId, location.pathname])
 
   const handleLogout = () => {
     dispatch(logout())
@@ -43,13 +49,14 @@ function AppLayout() {
             id="ws-switch"
             className="input"
             value={workspaceId ?? ''}
-            onChange={(e) => navigate(`/w/${e.target.value}`)}
+            onChange={(e) => navigate(e.target.value === '__new' ? '/workspaces/new' : `/w/${e.target.value}`)}
           >
             {!workspaceId && <option value="">Select a workspace</option>}
             {workspaces.map((w) => (
               <option key={w.id} value={w.id}>{w.name}</option>
             ))}
             {workspaceId && !inWorkspace && <option value={workspaceId}>Unavailable workspace</option>}
+            <option value="__new">+ Create workspace</option>
           </select>
         </div>
 
@@ -77,6 +84,20 @@ function AppLayout() {
                 </NavLink>
               </li>
             </ul>
+
+            <div className="app-section">
+              <span className="app-section-label">Projects</span>
+              <ul className="app-projects">
+                {projects.map((p) => (
+                  <li key={p.id}>
+                    <NavLink to={`/w/${workspaceId}/p/${p.id}`} className={linkClass}>
+                      <span className="app-project-name">{p.name}</span>
+                    </NavLink>
+                  </li>
+                ))}
+                {projects.length === 0 && <li className="muted">No projects yet</li>}
+              </ul>
+            </div>
           </>
         )}
 

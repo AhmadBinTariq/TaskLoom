@@ -28,6 +28,7 @@ const patch = (p, body) => request(p, { method: 'PATCH', body })
 const del = (p) => request(p, { method: 'DELETE' })
 
 const normUser = (u) => (u ? { id: u.id || u._id, name: u.name, email: u.email, theme: u.theme } : null)
+const normProject = (p) => ({ id: p.id || p._id, name: p.name, description: p.description, taskCount: p.taskCount, workspaceId: p.workspace })
 
 export const api = {
   auth: {
@@ -37,5 +38,8 @@ export const api = {
   },
   workspaces: {
     list: () => get('/workspaces'),
+  },
+  projects: {
+    list: (id) => get(`/workspaces/${id}/projects`).then((ps) => ps.map(normProject)),
   },
 }
