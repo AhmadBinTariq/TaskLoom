@@ -6,8 +6,10 @@ import { selectCurrentUser, selectToken, selectAuthLoading, setUser, logout } fr
 import { applyTheme } from './app/theme'
 import { LoadingState } from './components/States'
 import AppLayout from './components/AppLayout'
+import WorkspaceLayout from './components/WorkspaceLayout'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import NotFound from './pages/NotFound'
 
 function RequireAuth() {
   const user = useSelector(selectCurrentUser)
@@ -60,6 +62,11 @@ function App() {
 
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>
+
+            <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
+            </Route>
+
+            <Route path="*" element={<NotFound />} />
           </Route>
         </Route>
       </Routes>

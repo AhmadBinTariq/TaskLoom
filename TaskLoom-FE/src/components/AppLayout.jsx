@@ -20,6 +20,10 @@ function AppLayout() {
   const [projects, setProjects] = useState([])
   const inWorkspace = workspaceId && workspaces.some((w) => w.id === workspaceId)
 
+  const [menuOpenOn, setMenuOpenOn] = useState(null)
+  const menuOpen = menuOpenOn === location.pathname
+  const setMenuOpen = (open) => setMenuOpenOn(open ? location.pathname : null)
+
   useEffect(() => {
     api.workspaces.list().then(setWorkspaces).catch(() => setWorkspaces([]))
   }, [location.pathname])
@@ -38,7 +42,14 @@ function AppLayout() {
 
   return (
     <div className="app-shell">
-      <nav className="app-sidebar">
+      <header className="app-topbar">
+        <button className="btn btn--ghost btn--icon" onClick={() => setMenuOpen(!menuOpen)}>
+          <Icon name="menu" />
+        </button>
+        <span className="app-brand">Taskloom</span>
+      </header>
+
+      <nav className={`app-sidebar ${menuOpen ? 'app-sidebar-open' : ''}`}>
         <div className="app-brand-row">
           <span className="app-brand">Taskloom</span>
         </div>
@@ -116,6 +127,7 @@ function AppLayout() {
           </div>
         </div>
       </nav>
+      {menuOpen && <div className="app-scrim" onClick={() => setMenuOpen(false)} />}
 
       <main className="app-main">
         <Outlet />

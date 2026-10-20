@@ -38,6 +38,7 @@ export const api = {
   },
   workspaces: {
     list: () => get('/workspaces'),
+    get: (id) => get(`/workspaces/${id}`),
   },
   projects: {
     list: (id) => get(`/workspaces/${id}/projects`).then((ps) => ps.map(normProject)),
