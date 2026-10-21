@@ -9,6 +9,8 @@ import AppLayout from './components/AppLayout'
 import WorkspaceLayout from './components/WorkspaceLayout'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Home from './pages/Home'
+import NewWorkspace from './pages/NewWorkspace'
 import NotFound from './pages/NotFound'
 
 function RequireAuth() {
@@ -62,6 +64,8 @@ function App() {
 
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>
+            <Route path="/" element={<Home />} />
+            <Route path="/workspaces/new" element={<NewWorkspace />} />
 
             <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
             </Route>

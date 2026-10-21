@@ -1,0 +1,101 @@
+.ws-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.ws-project-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.ws-project-card:hover {
+  border-color: var(--color-border-strong);
+}
+
+.ws-project-link {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  min-width: 0;
+}
+
+.ws-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ws-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ws-form-actions > .btn--danger {
+  margin-right: auto;
+}
+
+.ws-panel {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 720px;
+}
+
+.ws-inline-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.ws-inline-form > .field {
+  flex: 1;
+  min-width: 180px;
+}
+
+.ws-label-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ws-swatches {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.ws-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  background-clip: content-box;
+  padding: 3px;
+}
+
+.ws-swatch[aria-pressed='true'] {
+  border-color: var(--color-text);
+}
+
+.ws-danger {
+  border-color: var(--color-error);
+}
+
+.ws-centered {
+  max-width: 480px;
+  margin: 2rem auto;
+  width: 100%;
+}
