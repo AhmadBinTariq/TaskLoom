@@ -11,6 +11,8 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Home from './pages/Home'
 import NewWorkspace from './pages/NewWorkspace'
+import Projects from './pages/Projects'
+import WorkspaceSettings from './pages/WorkspaceSettings'
 import NotFound from './pages/NotFound'
 
 function RequireAuth() {
@@ -68,6 +70,8 @@ function App() {
             <Route path="/workspaces/new" element={<NewWorkspace />} />
 
             <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
+              <Route index element={<Projects />} />
+              <Route path="settings" element={<WorkspaceSettings />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />

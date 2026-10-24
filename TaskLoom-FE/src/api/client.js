@@ -40,6 +40,9 @@ export const api = {
     list: () => get('/workspaces'),
     get: (id) => get(`/workspaces/${id}`),
     create: (name) => post('/workspaces', { name }),
+    rename: (id, name) => patch(`/workspaces/${id}`, { name }),
+    remove: (id) => del(`/workspaces/${id}`),
+    leave: (id) => post(`/workspaces/${id}/leave`),
   },
   projects: {
     list: (id) => get(`/workspaces/${id}/projects`).then((ps) => ps.map(normProject)),
