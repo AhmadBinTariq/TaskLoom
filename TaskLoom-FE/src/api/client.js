@@ -29,6 +29,23 @@ const del = (p) => request(p, { method: 'DELETE' })
 
 const normUser = (u) => (u ? { id: u.id || u._id, name: u.name, email: u.email, theme: u.theme } : null)
 const normProject = (p) => ({ id: p.id || p._id, name: p.name, description: p.description, taskCount: p.taskCount, workspaceId: p.workspace })
+const normColumn = (c) => ({ id: c.id || c._id, name: c.name, position: c.position, projectId: c.project })
+const normTask = (t) => ({
+  id: t.id || t._id,
+  title: t.title,
+  description: t.description,
+  assigneeId: t.assignee || null,
+  dueDate: t.dueDate || null,
+  priority: t.priority,
+  labelIds: (t.labels || []).map(String),
+  position: t.position,
+  columnId: t.column,
+  projectId: t.project,
+  workspaceId: t.workspace,
+  createdBy: t.createdBy,
+  createdAt: t.createdAt,
+  updatedAt: t.updatedAt,
+})
 const normLabel = (l) => ({ id: l.id || l._id, name: l.name, color: l.color })
 
 export const api = {
@@ -55,5 +72,9 @@ export const api = {
     create: (id, body) => post(`/workspaces/${id}/projects`, body).then(normProject),
     update: (id, body) => patch(`/projects/${id}`, body).then(normProject),
     remove: (id) => del(`/projects/${id}`),
+    board: (id) => get(`/projects/${id}/board`).then((b) => ({ project: normProject(b.project), columns: b.columns.map(normColumn), tasks: b.tasks.map(normTask) })),
+  },
+  tasks: {
+    move: (id, body) => patch(`/tasks/${id}/move`, body).then(normTask),
   },
 }

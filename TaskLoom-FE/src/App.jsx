@@ -12,6 +12,7 @@ import Register from './pages/Register'
 import Home from './pages/Home'
 import NewWorkspace from './pages/NewWorkspace'
 import Projects from './pages/Projects'
+import Board from './pages/Board'
 import WorkspaceSettings from './pages/WorkspaceSettings'
 import NotFound from './pages/NotFound'
 
@@ -71,6 +72,8 @@ function App() {
 
             <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
               <Route index element={<Projects />} />
+              <Route path="p/:projectId" element={<Board />}>
+              </Route>
               <Route path="settings" element={<WorkspaceSettings />} />
             </Route>
 

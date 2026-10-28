@@ -1,0 +1,243 @@
+.board-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.board-filters > select {
+  width: auto;
+  min-width: 140px;
+  flex: 0 1 auto;
+}
+
+.board-search-box {
+  position: relative;
+  flex: 1 1 220px;
+  display: flex;
+  align-items: center;
+}
+
+.board-search-box > svg {
+  position: absolute;
+  left: 0.7rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.board-search-box > input {
+  padding-left: 2.1rem;
+}
+
+.board-wrap {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.board {
+  flex: 1;
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 1rem;
+  min-width: 0;
+}
+
+.board-column {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  max-height: calc(100vh - 220px);
+}
+
+.board-column-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 32px;
+}
+
+.board-column-title {
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.board-column-actions {
+  margin-left: auto;
+  display: flex;
+}
+
+.board-rename-form {
+  display: flex;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.board-rename-form input {
+  min-height: 32px;
+  padding: 0.25rem 0.5rem;
+}
+
+.board-cards {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 60px;
+  padding: 0.25rem;
+  margin: -0.25rem;
+  border: 2px dashed transparent;
+  border-radius: var(--radius);
+  overflow-y: auto;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.board-drop-target {
+  background-color: var(--color-red-tint);
+  border-color: var(--color-red-text);
+}
+
+.board-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: grab;
+}
+
+.board-card:hover {
+  border-color: var(--color-border-strong);
+}
+
+.board-card:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.board-dragging {
+  box-shadow: var(--shadow);
+  border-color: var(--color-red-text);
+  cursor: grabbing;
+}
+
+.board-card-title {
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.board-card-title:hover {
+  text-decoration: underline;
+}
+
+.board-card-labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+}
+
+.board-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.board-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.board-spacer {
+  flex: 1;
+}
+
+.board-due {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.board-overdue {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+.board-today {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.board-empty-column {
+  padding: 1rem 0.5rem;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.board-add-task {
+  justify-content: flex-start;
+}
+
+.board-add-column {
+  background-color: transparent;
+  border-style: dashed;
+}
+
+.board-activity-panel {
+  flex: 0 0 320px;
+  padding: 1rem;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.board-activity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (max-width: 1100px) {
+  .board-wrap {
+    flex-direction: column;
+  }
+  .board-activity-panel {
+    flex-basis: auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 860px) {
+  .board-column {
+    flex-basis: 260px;
+    max-height: none;
+  }
+}
