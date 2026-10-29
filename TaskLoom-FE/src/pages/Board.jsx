@@ -6,8 +6,13 @@ import { api } from '../api/client'
 import { toast } from '../features/ui/uiSlice'
 import { useWorkspace } from '../components/WorkspaceLayout'
 import PageHeader from '../components/PageHeader'
+import Modal from '../components/Modal'
+import Icon from '../components/Icon'
+import TaskFields from '../components/TaskFields'
 import { LoadingState, EmptyState } from '../components/States'
 import '../components/board.css'
+
+const blankTask = { title: '', description: '', assigneeId: null, dueDate: null, priority: 'medium', labelIds: [] }
 
 function Board() {
   const workspaceContext = useWorkspace()
@@ -16,7 +21,11 @@ function Board() {
   const dispatch = useDispatch()
 
   const [board, setBoard] = useState(null)
+  const [members, setMembers] = useState([])
+  const [labels, setLabels] = useState([])
   const [status, setStatus] = useState('loading')
+
+  const [createIn, setCreateIn] = useState(null)
 
   const reloadBoard = useCallback(() => {
     return api.projects
@@ -28,7 +37,9 @@ function Board() {
   useEffect(() => {
     setStatus('loading')
     reloadBoard()
-  }, [projectId, reloadBoard])
+    api.members.list(workspace.id).then(setMembers).catch(() => setMembers([]))
+    api.labels.list(workspace.id).then(setLabels).catch(() => setLabels([]))
+  }, [projectId, workspace.id, reloadBoard])
 
   const reload = () => {
     reloadBoard()
@@ -39,6 +50,7 @@ function Board() {
 
   const { project, columns, tasks } = board
   const canWrite = can('task:write')
+  const canManage = can('project:manage')
 
   const visibleByColumn = {}
   for (const t of tasks) {
@@ -77,22 +89,92 @@ function Board() {
                 column={column}
                 tasks={visibleByColumn[column.id] ?? []}
                 totalInColumn={tasks.filter((t) => t.columnId === column.id).length}
+                columnCount={columns.length}
                 canWrite={canWrite}
+                canManage={canManage}
+                onAddTask={() => setCreateIn(column)}
+                onChanged={reload}
               />
             ))}
+            {canManage && <AddColumn projectId={projectId} columnCount={columns.length} onChanged={reload} />}
           </div>
         </DragDropContext>
       </div>
+
+      {createIn && (
+        <CreateTaskModal column={createIn} projectId={projectId} members={members} labels={labels} onClose={() => setCreateIn(null)} onDone={() => { setCreateIn(null); reload() }} />
+      )}
     </>
   )
 }
 
-function BoardColumn({ column, tasks, totalInColumn, columnCount, canWrite, canManage, onChanged }) {
+function BoardColumn({ column, tasks, totalInColumn, columnCount, canWrite, canManage, onAddTask, onChanged }) {
+  const dispatch = useDispatch()
+  const [renaming, setRenaming] = useState(false)
+  const [name, setName] = useState(column.name)
+
+  async function saveRename(e) {
+    e.preventDefault()
+    if (!name.trim()) return
+    try {
+      await api.columns.rename(column.id, name.trim())
+      setRenaming(false)
+      onChanged()
+    } catch (err) {
+      dispatch(toast(err.message, 'error'))
+    }
+  }
+
+  async function handleDelete() {
+    if (totalInColumn > 0) {
+      dispatch(toast('Move or delete the tasks in this column first.', 'warning'))
+      return
+    }
+    if (columnCount <= 1) {
+      dispatch(toast('A board needs at least one column.', 'warning'))
+      return
+    }
+    if (!confirm(`Delete the "${column.name}" column?`)) return
+    try {
+      await api.columns.remove(column.id)
+      onChanged()
+    } catch (err) {
+      dispatch(toast(err.message, 'error'))
+    }
+  }
+
   return (
     <section className="board-column">
       <header className="board-column-header">
-        <h2 className="board-column-title">{column.name}</h2>
+        {renaming ? (
+          <form className="board-rename-form" onSubmit={saveRename}>
+            <input
+              id={`rename-${column.id}`}
+              className="input"
+              value={name}
+              maxLength={30}
+              autoFocus
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { setRenaming(false); setName(column.name) } }}
+            />
+            <button className="btn btn--primary btn--sm" type="submit">Save</button>
+          </form>
+        ) : (
+          <>
+            <h2 className="board-column-title">{column.name}</h2>
             <span className="board-count">{tasks.length === totalInColumn ? totalInColumn : `${tasks.length}/${totalInColumn}`}</span>
+            {canManage && (
+              <span className="board-column-actions">
+                <button className="btn btn--ghost btn--icon" aria-label={`Rename ${column.name}`} onClick={() => { setName(column.name); setRenaming(true) }}>
+                  <Icon name="edit" size={14} />
+                </button>
+                <button className="btn btn--ghost btn--icon" aria-label={`Delete ${column.name}`} onClick={handleDelete}>
+                  <Icon name="trash" size={14} />
+                </button>
+              </span>
+            )}
+          </>
+        )}
       </header>
 
       <Droppable droppableId={column.id} isDropDisabled={!canWrite}>
@@ -112,7 +194,81 @@ function BoardColumn({ column, tasks, totalInColumn, columnCount, canWrite, canM
           </ol>
         )}
       </Droppable>
+
+      {canWrite && (
+        <button className="btn btn--ghost btn--sm board-add-task" onClick={onAddTask}>
+          <Icon name="plus" size={14} /> Add task
+        </button>
+      )}
     </section>
+  )
+}
+
+function AddColumn({ projectId, columnCount, onChanged }) {
+  const dispatch = useDispatch()
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+
+  async function submit(e) {
+    e.preventDefault()
+    if (!name.trim()) return
+    if (columnCount >= 10) {
+      setError('A board can have at most 10 columns.')
+      return
+    }
+    try {
+      await api.columns.create(projectId, name.trim())
+      setName('')
+      setError('')
+      onChanged()
+    } catch (err) {
+      dispatch(toast(err.message, 'error'))
+    }
+  }
+
+  return (
+    <form className="board-column board-add-column" onSubmit={submit}>
+      <label htmlFor="new-column" className="field-label">Add a column</label>
+      <input id="new-column" className="input" placeholder="e.g. Blocked" value={name} maxLength={30} onChange={(e) => setName(e.target.value)} />
+      {error && <span className="field-error">{error}</span>}
+      <button className="btn btn--outline btn--sm" type="submit"><Icon name="plus" size={14} /> Add column</button>
+    </form>
+  )
+}
+
+function CreateTaskModal({ column, projectId, members, labels, onClose, onDone }) {
+  const dispatch = useDispatch()
+  const [form, setForm] = useState(blankTask)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function submit(e) {
+    e.preventDefault()
+    if (form.title.trim().length < 1) {
+      setError('Title is required.')
+      return
+    }
+    setBusy(true)
+    try {
+      await api.tasks.create(projectId, { ...form, title: form.title.trim(), columnId: column.id })
+      dispatch(toast('Task created.', 'success'))
+      onDone()
+    } catch (err) {
+      setError(err.message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal open title={`New task in ${column.name}`} onClose={onClose}>
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <TaskFields idPrefix="new-task" value={form} onChange={setForm} members={members} labels={labels} errors={error ? { title: error } : {}} />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+          <button type="button" className="btn btn--outline" onClick={onClose}>Cancel</button>
+          <button className="btn btn--primary" type="submit" disabled={busy}>Create task</button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 

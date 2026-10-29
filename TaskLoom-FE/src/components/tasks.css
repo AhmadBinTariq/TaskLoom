@@ -1,0 +1,129 @@
+.task-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.task-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.task-fields,
+.task-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.task-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.task-label-picker {
+  border: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.task-label-picker legend {
+  margin-bottom: 0.4rem;
+}
+
+.task-label-option {
+  cursor: pointer;
+  padding: 0.25rem 0.65rem;
+  font-weight: 500;
+}
+
+.task-label-option:has(:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.task-label-checked {
+  border-color: var(--color-text);
+  background-color: var(--color-surface-hover);
+  font-weight: 700;
+}
+
+.task-inline-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.task-read-only {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.task-read-only dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1rem;
+  align-items: center;
+}
+
+.task-read-only dt {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.task-description {
+  white-space: pre-wrap;
+}
+
+.task-labels-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.task-comments,
+.task-activity {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.task-comments li,
+.task-activity li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.task-activity li p {
+  font-size: 0.88rem;
+}
+
+.task-comment-meta {
+  font-size: 0.85rem;
+}
+
+.task-comment-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.task-mention {
+  color: var(--color-red-text);
+  font-weight: 600;
+}
+
+.task-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}

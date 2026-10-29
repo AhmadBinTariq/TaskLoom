@@ -62,6 +62,9 @@ export const api = {
     remove: (id) => del(`/workspaces/${id}`),
     leave: (id) => post(`/workspaces/${id}/leave`),
   },
+  members: {
+    list: (id) => get(`/workspaces/${id}/members`),
+  },
   labels: {
     list: (id) => get(`/workspaces/${id}/labels`).then((ls) => ls.map(normLabel)),
     create: (id, body) => post(`/workspaces/${id}/labels`, body).then(normLabel),
@@ -74,7 +77,13 @@ export const api = {
     remove: (id) => del(`/projects/${id}`),
     board: (id) => get(`/projects/${id}/board`).then((b) => ({ project: normProject(b.project), columns: b.columns.map(normColumn), tasks: b.tasks.map(normTask) })),
   },
+  columns: {
+    create: (projectId, name) => post(`/projects/${projectId}/columns`, { name }).then(normColumn),
+    rename: (id, name) => patch(`/columns/${id}`, { name }).then(normColumn),
+    remove: (id) => del(`/columns/${id}`),
+  },
   tasks: {
+    create: (projectId, body) => post(`/projects/${projectId}/tasks`, body).then(normTask),
     move: (id, body) => patch(`/tasks/${id}/move`, body).then(normTask),
   },
 }
