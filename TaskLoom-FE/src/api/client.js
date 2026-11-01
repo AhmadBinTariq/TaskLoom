@@ -47,6 +47,7 @@ const normTask = (t) => ({
   updatedAt: t.updatedAt,
 })
 const normLabel = (l) => ({ id: l.id || l._id, name: l.name, color: l.color })
+const normActivity = (a) => ({ id: a.id || a._id, type: a.type, data: a.data, createdAt: a.createdAt, actor: a.actor })
 
 export const api = {
   auth: {
@@ -85,5 +86,8 @@ export const api = {
   tasks: {
     create: (projectId, body) => post(`/projects/${projectId}/tasks`, body).then(normTask),
     move: (id, body) => patch(`/tasks/${id}/move`, body).then(normTask),
+  },
+  activity: {
+    list: (params) => get('/activity?' + new URLSearchParams(params)).then((as) => as.map(normActivity)),
   },
 }

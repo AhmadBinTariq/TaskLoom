@@ -9,6 +9,8 @@ import PageHeader from '../components/PageHeader'
 import Modal from '../components/Modal'
 import Icon from '../components/Icon'
 import TaskFields from '../components/TaskFields'
+import ActivityList from '../components/ActivityList'
+import { TaskCardContent } from '../components/TaskCard'
 import { LoadingState, EmptyState } from '../components/States'
 import '../components/board.css'
 
@@ -23,8 +25,10 @@ function Board() {
   const [board, setBoard] = useState(null)
   const [members, setMembers] = useState([])
   const [labels, setLabels] = useState([])
+  const [activity, setActivity] = useState([])
   const [status, setStatus] = useState('loading')
 
+  const [showActivity, setShowActivity] = useState(false)
   const [createIn, setCreateIn] = useState(null)
 
   const reloadBoard = useCallback(() => {
@@ -34,15 +38,21 @@ function Board() {
       .catch(() => setStatus('error'))
   }, [projectId])
 
+  const reloadActivity = useCallback(() => {
+    api.activity.list({ projectId }).then(setActivity).catch(() => setActivity([]))
+  }, [projectId])
+
   useEffect(() => {
     setStatus('loading')
     reloadBoard()
+    reloadActivity()
     api.members.list(workspace.id).then(setMembers).catch(() => setMembers([]))
     api.labels.list(workspace.id).then(setLabels).catch(() => setLabels([]))
-  }, [projectId, workspace.id, reloadBoard])
+  }, [projectId, workspace.id, reloadBoard, reloadActivity])
 
   const reload = () => {
     reloadBoard()
+    reloadActivity()
   }
 
   if (status === 'loading') return <LoadingState label="Loading board…" />
@@ -78,6 +88,11 @@ function Board() {
       <PageHeader
         title={project.name}
         subtitle={project.description || undefined}
+        actions={
+          <button className="btn btn--outline" aria-pressed={showActivity} onClick={() => setShowActivity((s) => !s)}>
+            <Icon name="activity" size={16} /> Activity
+          </button>
+        }
       />
 
       <div className="board-wrap">
@@ -90,6 +105,9 @@ function Board() {
                 tasks={visibleByColumn[column.id] ?? []}
                 totalInColumn={tasks.filter((t) => t.columnId === column.id).length}
                 columnCount={columns.length}
+                workspaceId={workspace.id}
+                labels={labels}
+                members={members}
                 canWrite={canWrite}
                 canManage={canManage}
                 onAddTask={() => setCreateIn(column)}
@@ -99,6 +117,18 @@ function Board() {
             {canManage && <AddColumn projectId={projectId} columnCount={columns.length} onChanged={reload} />}
           </div>
         </DragDropContext>
+
+        {showActivity && (
+          <aside className="card board-activity-panel" aria-label="Project activity">
+            <div className="board-activity-header">
+              <h2>Activity</h2>
+              <button className="btn btn--ghost btn--icon" aria-label="Close activity" onClick={() => setShowActivity(false)}>
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            <ActivityList items={activity} />
+          </aside>
+        )}
       </div>
 
       {createIn && (
@@ -108,7 +138,7 @@ function Board() {
   )
 }
 
-function BoardColumn({ column, tasks, totalInColumn, columnCount, canWrite, canManage, onAddTask, onChanged }) {
+function BoardColumn({ column, tasks, totalInColumn, columnCount, workspaceId, labels, members, canWrite, canManage, onAddTask, onChanged }) {
   const dispatch = useDispatch()
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState(column.name)
@@ -184,7 +214,7 @@ function BoardColumn({ column, tasks, totalInColumn, columnCount, canWrite, canM
               <Draggable key={task.id} draggableId={task.id} index={index} isDragDisabled={!canWrite}>
                 {(drag, dragSnapshot) => (
                   <li ref={drag.innerRef} {...drag.draggableProps} {...drag.dragHandleProps} className={`board-card ${dragSnapshot.isDragging ? 'board-dragging' : ''}`}>
-                    <span>{task.title}</span>
+                    <TaskCardContent task={task} to={`/w/${workspaceId}/p/${task.projectId}/t/${task.id}`} labels={labels} members={members} />
                   </li>
                 )}
               </Draggable>
