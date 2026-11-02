@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'react-router-dom'
+import { Outlet, useParams } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { api } from '../api/client'
 import { toast } from '../features/ui/uiSlice'
+import { emptyFilters, hasActiveFilters, matchesFilters } from '../app/filters'
 import { useWorkspace } from '../components/WorkspaceLayout'
 import PageHeader from '../components/PageHeader'
 import Modal from '../components/Modal'
 import Icon from '../components/Icon'
+import FilterBar from '../components/FilterBar'
 import TaskFields from '../components/TaskFields'
 import ActivityList from '../components/ActivityList'
 import { TaskCardContent } from '../components/TaskCard'
@@ -28,6 +30,7 @@ function Board() {
   const [activity, setActivity] = useState([])
   const [status, setStatus] = useState('loading')
 
+  const [filters, setFilters] = useState(emptyFilters)
   const [showActivity, setShowActivity] = useState(false)
   const [createIn, setCreateIn] = useState(null)
 
@@ -64,9 +67,11 @@ function Board() {
 
   const visibleByColumn = {}
   for (const t of tasks) {
+    if (!matchesFilters(t, filters)) continue
     if (!visibleByColumn[t.columnId]) visibleByColumn[t.columnId] = []
     visibleByColumn[t.columnId].push(t)
   }
+  const visibleCount = Object.values(visibleByColumn).reduce((n, list) => n + list.length, 0)
 
   async function onDragEnd(result) {
     const { source, destination, draggableId } = result
@@ -94,6 +99,9 @@ function Board() {
           </button>
         }
       />
+
+      <FilterBar value={filters} onChange={setFilters} members={members} labels={labels} />
+      {hasActiveFilters(filters) && <p className="muted" role="status">Showing {visibleCount} of {tasks.length} tasks.</p>}
 
       <div className="board-wrap">
         <DragDropContext onDragEnd={onDragEnd}>
@@ -134,6 +142,8 @@ function Board() {
       {createIn && (
         <CreateTaskModal column={createIn} projectId={projectId} members={members} labels={labels} onClose={() => setCreateIn(null)} onDone={() => { setCreateIn(null); reload() }} />
       )}
+
+      <Outlet context={{ ...workspaceContext, reloadBoard: reload }} />
     </>
   )
 }
@@ -220,7 +230,7 @@ function BoardColumn({ column, tasks, totalInColumn, columnCount, workspaceId, l
               </Draggable>
             ))}
             {provided.placeholder}
-            {tasks.length === 0 && !snapshot.isDraggingOver && <li className="board-empty-column">No tasks</li>}
+            {tasks.length === 0 && !snapshot.isDraggingOver && <li className="board-empty-column">{totalInColumn > 0 ? 'No matching tasks' : 'No tasks'}</li>}
           </ol>
         )}
       </Droppable>

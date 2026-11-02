@@ -13,6 +13,7 @@ import Home from './pages/Home'
 import NewWorkspace from './pages/NewWorkspace'
 import Projects from './pages/Projects'
 import Board from './pages/Board'
+import TaskDrawer from './pages/TaskDrawer'
 import WorkspaceSettings from './pages/WorkspaceSettings'
 import NotFound from './pages/NotFound'
 
@@ -73,6 +74,7 @@ function App() {
             <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
               <Route index element={<Projects />} />
               <Route path="p/:projectId" element={<Board />}>
+                <Route path="t/:taskId" element={<TaskDrawer />} />
               </Route>
               <Route path="settings" element={<WorkspaceSettings />} />
             </Route>

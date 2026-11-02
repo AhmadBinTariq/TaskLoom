@@ -85,6 +85,8 @@ export const api = {
   },
   tasks: {
     create: (projectId, body) => post(`/projects/${projectId}/tasks`, body).then(normTask),
+    get: (id) => get(`/tasks/${id}`).then(normTask),
+    update: (id, body) => patch(`/tasks/${id}`, body).then(normTask),
     move: (id, body) => patch(`/tasks/${id}/move`, body).then(normTask),
   },
   activity: {
