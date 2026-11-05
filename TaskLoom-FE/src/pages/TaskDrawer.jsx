@@ -3,9 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { api } from '../api/client'
 import { toast } from '../features/ui/uiSlice'
+import { timeAgo } from '../app/format'
 import { useWorkspace } from '../components/WorkspaceLayout'
 import Modal from '../components/Modal'
 import TaskFields from '../components/TaskFields'
+import { PriorityBadge, LabelChip, DueBadge } from '../components/TaskCard'
 import '../components/tasks.css'
 
 function toInput(t) {
@@ -46,6 +48,7 @@ function TaskDrawer() {
             task={task}
             members={members}
             labels={labels}
+            canWrite={can('task:write')}
             onSaved={(updated) => { setTask(updated); reloadBoard() }}
           />
         </div>
@@ -54,10 +57,14 @@ function TaskDrawer() {
   )
 }
 
-function TaskEditor({ task, members, labels, onSaved }) {
+function TaskEditor({ task, members, labels, canWrite, canDelete, onSaved, onDeleted }) {
   const dispatch = useDispatch()
   const [form, setForm] = useState(() => toInput(task))
   const [busy, setBusy] = useState(false)
+  const dirty = JSON.stringify(form) !== JSON.stringify(toInput(task))
+
+  const creator = members.find((m) => m.user.id === task.createdBy)?.user.name ?? 'a former member'
+  const assignee = members.find((m) => m.user.id === task.assigneeId)?.user.name
 
   async function submit(e) {
     e.preventDefault()
@@ -76,13 +83,40 @@ function TaskEditor({ task, members, labels, onSaved }) {
 
   return (
     <section className="task-section">
-      <form onSubmit={submit} className="task-editor">
-        <TaskFields idPrefix={`edit-${task.id}`} value={form} onChange={setForm} members={members} labels={labels} errors={{}} />
-        <div className="task-inline-actions">
-          <span style={{ flex: 1 }} />
-          <button className="btn btn--primary" type="submit" disabled={busy}>Save changes</button>
+      <p className="muted" style={{ fontSize: '0.82rem' }}>
+        Created by {creator} {timeAgo(task.createdAt)} · updated {timeAgo(task.updatedAt)}
+      </p>
+
+      {canWrite ? (
+        <form onSubmit={submit} className="task-editor">
+          <TaskFields idPrefix={`edit-${task.id}`} value={form} onChange={setForm} members={members} labels={labels} errors={{}} />
+          <div className="task-inline-actions">
+            <span style={{ flex: 1 }} />
+            {dirty && <button type="button" className="btn btn--outline" onClick={() => setForm(toInput(task))}>Discard changes</button>}
+            <button className="btn btn--primary" type="submit" disabled={!dirty || busy}>Save changes</button>
+          </div>
+        </form>
+      ) : (
+        <div className="task-read-only">
+          <p className="alert alert--info"><Icon name="alert" size={16} /> You have read-only access to this workspace.</p>
+          <p className="task-description">{task.description || <span className="muted">No description</span>}</p>
+          <dl>
+            <dt>Assignee</dt>
+            <dd>{assignee ?? 'Unassigned'}</dd>
+            <dt>Priority</dt>
+            <dd><PriorityBadge priority={task.priority} /></dd>
+            <dt>Due</dt>
+            <dd>{task.dueDate ? <DueBadge date={task.dueDate} /> : 'No due date'}</dd>
+            <dt>Labels</dt>
+            <dd className="task-labels-row">
+              {task.labelIds.length === 0 ? 'None' : task.labelIds.map((id) => {
+                const l = labels.find((x) => x.id === id)
+                return l ? <LabelChip key={id} label={l} /> : null
+              })}
+            </dd>
+          </dl>
         </div>
-      </form>
+      )}
     </section>
   )
 }

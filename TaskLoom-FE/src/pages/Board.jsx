@@ -102,6 +102,9 @@ function Board() {
 
       <FilterBar value={filters} onChange={setFilters} members={members} labels={labels} />
       {hasActiveFilters(filters) && <p className="muted" role="status">Showing {visibleCount} of {tasks.length} tasks.</p>}
+      {!canWrite && (
+        <p className="alert alert--info"><Icon name="alert" size={16} /> You are a Viewer: you can browse the board but not change it.</p>
+      )}
 
       <div className="board-wrap">
         <DragDropContext onDragEnd={onDragEnd}>
