@@ -47,6 +47,7 @@ const normTask = (t) => ({
   updatedAt: t.updatedAt,
 })
 const normLabel = (l) => ({ id: l.id || l._id, name: l.name, color: l.color })
+const normComment = (c) => ({ id: c.id || c._id, body: c.body, mentionIds: (c.mentions || c.mentionIds || []).map(String), createdAt: c.createdAt, author: c.author })
 const normActivity = (a) => ({ id: a.id || a._id, type: a.type, data: a.data, createdAt: a.createdAt, actor: a.actor })
 
 export const api = {
@@ -88,6 +89,11 @@ export const api = {
     get: (id) => get(`/tasks/${id}`).then(normTask),
     update: (id, body) => patch(`/tasks/${id}`, body).then(normTask),
     move: (id, body) => patch(`/tasks/${id}/move`, body).then(normTask),
+    remove: (id) => del(`/tasks/${id}`),
+  },
+  comments: {
+    list: (taskId) => get(`/tasks/${taskId}/comments`).then((cs) => cs.map(normComment)),
+    create: (taskId, body) => post(`/tasks/${taskId}/comments`, body).then(normComment),
   },
   activity: {
     list: (params) => get('/activity?' + new URLSearchParams(params)).then((as) => as.map(normActivity)),

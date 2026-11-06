@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useDispatch } from 'react-redux'
+import { useSelector, useDispatch } from 'react-redux'
 import { api } from '../api/client'
+import { selectCurrentUser } from '../features/auth/authSlice'
 import { toast } from '../features/ui/uiSlice'
+import { canDeleteTask } from '../app/permissions'
 import { timeAgo } from '../app/format'
 import { useWorkspace } from '../components/WorkspaceLayout'
 import Modal from '../components/Modal'
+import Icon from '../components/Icon'
 import TaskFields from '../components/TaskFields'
+import Comments from '../components/Comments'
+import ActivityList from '../components/ActivityList'
 import { PriorityBadge, LabelChip, DueBadge } from '../components/TaskCard'
 import '../components/tasks.css'
 
@@ -18,10 +23,12 @@ function TaskDrawer() {
   const { workspace, can, reloadBoard } = useWorkspace()
   const { projectId, taskId } = useParams()
   const navigate = useNavigate()
+  const me = useSelector(selectCurrentUser)
 
   const [task, setTask] = useState(null)
   const [members, setMembers] = useState([])
   const [labels, setLabels] = useState([])
+  const [activity, setActivity] = useState([])
   const [status, setStatus] = useState('loading')
 
   const close = () => navigate(`/w/${workspace.id}/p/${projectId}`)
@@ -35,6 +42,7 @@ function TaskDrawer() {
       .catch(() => { if (active) setStatus('error') })
     api.members.list(workspace.id).then((m) => active && setMembers(m)).catch(() => {})
     api.labels.list(workspace.id).then((l) => active && setLabels(l)).catch(() => {})
+    api.activity.list({ taskId }).then((a) => active && setActivity(a)).catch(() => {})
     return () => { active = false }
   }, [taskId, workspace.id])
 
@@ -49,8 +57,15 @@ function TaskDrawer() {
             members={members}
             labels={labels}
             canWrite={can('task:write')}
+            canDelete={canDeleteTask(workspace.myRole, me.id, task.createdBy)}
             onSaved={(updated) => { setTask(updated); reloadBoard() }}
+            onDeleted={() => { reloadBoard(); close() }}
           />
+          <Comments taskId={taskId} members={members} canComment={can('comment:create')} />
+          <section className="task-section">
+            <h3>History</h3>
+            <ActivityList items={activity} />
+          </section>
         </div>
       )}
     </Modal>
@@ -81,6 +96,19 @@ function TaskEditor({ task, members, labels, canWrite, canDelete, onSaved, onDel
     }
   }
 
+  async function handleDelete() {
+    if (!confirm(`Delete "${task.title}"? Comments are deleted too.`)) return
+    setBusy(true)
+    try {
+      await api.tasks.remove(task.id)
+      dispatch(toast('Task deleted.', 'success'))
+      onDeleted()
+    } catch (err) {
+      dispatch(toast(err.message, 'error'))
+      setBusy(false)
+    }
+  }
+
   return (
     <section className="task-section">
       <p className="muted" style={{ fontSize: '0.82rem' }}>
@@ -91,6 +119,7 @@ function TaskEditor({ task, members, labels, canWrite, canDelete, onSaved, onDel
         <form onSubmit={submit} className="task-editor">
           <TaskFields idPrefix={`edit-${task.id}`} value={form} onChange={setForm} members={members} labels={labels} errors={{}} />
           <div className="task-inline-actions">
+            {canDelete && <button type="button" className="btn btn--danger" onClick={handleDelete} disabled={busy}><Icon name="trash" size={16} /> Delete</button>}
             <span style={{ flex: 1 }} />
             {dirty && <button type="button" className="btn btn--outline" onClick={() => setForm(toInput(task))}>Discard changes</button>}
             <button className="btn btn--primary" type="submit" disabled={!dirty || busy}>Save changes</button>
