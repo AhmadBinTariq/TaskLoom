@@ -66,6 +66,8 @@ export const api = {
   },
   members: {
     list: (id) => get(`/workspaces/${id}/members`),
+    updateRole: (id, userId, role) => patch(`/workspaces/${id}/members/${userId}`, { role }),
+    remove: (id, userId) => del(`/workspaces/${id}/members/${userId}`),
   },
   labels: {
     list: (id) => get(`/workspaces/${id}/labels`).then((ls) => ls.map(normLabel)),
