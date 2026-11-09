@@ -63,11 +63,17 @@ export const api = {
     rename: (id, name) => patch(`/workspaces/${id}`, { name }),
     remove: (id) => del(`/workspaces/${id}`),
     leave: (id) => post(`/workspaces/${id}/leave`),
+    search: (id, filters) => get(`/workspaces/${id}/search?` + new URLSearchParams(filters)).then((rows) => rows.map((r) => ({ task: normTask(r.task), projectName: r.projectName, columnName: r.columnName }))),
   },
   members: {
     list: (id) => get(`/workspaces/${id}/members`),
     updateRole: (id, userId, role) => patch(`/workspaces/${id}/members/${userId}`, { role }),
     remove: (id, userId) => del(`/workspaces/${id}/members/${userId}`),
+  },
+  invitations: {
+    list: (id) => get(`/workspaces/${id}/invitations`),
+    create: (id, body) => post(`/workspaces/${id}/invitations`, body),
+    revoke: (id, invId) => del(`/workspaces/${id}/invitations/${invId}`),
   },
   labels: {
     list: (id) => get(`/workspaces/${id}/labels`).then((ls) => ls.map(normLabel)),

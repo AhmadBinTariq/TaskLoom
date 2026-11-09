@@ -1,0 +1,35 @@
+.search-results {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.search-result {
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.search-title {
+  font-weight: 600;
+}
+
+.search-title:hover {
+  text-decoration: underline;
+}
+
+.search-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.search-assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
