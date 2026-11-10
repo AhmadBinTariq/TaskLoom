@@ -187,10 +187,11 @@ function BoardColumn({ column, tasks, totalInColumn, columnCount, workspaceId, l
   }
 
   return (
-    <section className="board-column">
+    <section className="board-column" aria-label={`${column.name} column`}>
       <header className="board-column-header">
         {renaming ? (
           <form className="board-rename-form" onSubmit={saveRename}>
+            <label htmlFor={`rename-${column.id}`} className="visually-hidden">Column name</label>
             <input
               id={`rename-${column.id}`}
               className="input"

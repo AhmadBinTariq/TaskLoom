@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { api } from '../api/client'
-import { selectCurrentUser, logout } from '../features/auth/authSlice'
+import { selectCurrentUser, setUser, logout } from '../features/auth/authSlice'
+import { applyTheme } from '../app/theme'
 import Avatar from './Avatar'
 import Icon from './Icon'
 import './AppLayout.css'
@@ -25,6 +26,10 @@ function AppLayout() {
   const setMenuOpen = (open) => setMenuOpenOn(open ? location.pathname : null)
 
   useEffect(() => {
+    applyTheme(user.theme)
+  }, [user.theme])
+
+  useEffect(() => {
     api.workspaces.list().then(setWorkspaces).catch(() => setWorkspaces([]))
   }, [location.pathname])
 
@@ -32,6 +37,17 @@ function AppLayout() {
     if (workspaceId) api.projects.list(workspaceId).then(setProjects).catch(() => setProjects([]))
     else setProjects([])
   }, [workspaceId, location.pathname])
+
+  const nextTheme = user.theme === 'dark' ? 'light' : 'dark'
+  const toggleTheme = async () => {
+    applyTheme(nextTheme)
+    try {
+      const updated = await api.auth.updateProfile({ theme: nextTheme })
+      dispatch(setUser(updated))
+    } catch {
+      applyTheme(user.theme)
+    }
+  }
 
   const handleLogout = () => {
     dispatch(logout())
@@ -43,13 +59,13 @@ function AppLayout() {
   return (
     <div className="app-shell">
       <header className="app-topbar">
-        <button className="btn btn--ghost btn--icon" onClick={() => setMenuOpen(!menuOpen)}>
+        <button className="btn btn--ghost btn--icon" aria-label="Open navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>
           <Icon name="menu" />
         </button>
         <span className="app-brand">Taskloom</span>
       </header>
 
-      <nav className={`app-sidebar ${menuOpen ? 'app-sidebar-open' : ''}`}>
+      <nav className={`app-sidebar ${menuOpen ? 'app-sidebar-open' : ''}`} aria-label="Main">
         <div className="app-brand-row">
           <span className="app-brand">Taskloom</span>
         </div>
@@ -113,6 +129,9 @@ function AppLayout() {
         )}
 
         <div className="app-footer">
+          <button className="btn btn--ghost btn--sm" onClick={toggleTheme} aria-label={`Switch to ${nextTheme} mode`}>
+            <Icon name={user.theme === 'dark' ? 'sun' : 'moon'} size={16} /> {user.theme === 'dark' ? 'Light' : 'Dark'} mode
+          </button>
           <div className="app-user-row">
             <NavLink to="/settings" className="app-user">
               <Avatar name={user.name} />

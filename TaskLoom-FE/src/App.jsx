@@ -5,12 +5,15 @@ import { api } from './api/client'
 import { selectCurrentUser, selectToken, selectAuthLoading, setUser, logout } from './features/auth/authSlice'
 import { applyTheme } from './app/theme'
 import { LoadingState } from './components/States'
+import Toaster from './components/Toaster'
 import AppLayout from './components/AppLayout'
 import WorkspaceLayout from './components/WorkspaceLayout'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Invite from './pages/Invite'
 import Home from './pages/Home'
 import NewWorkspace from './pages/NewWorkspace'
+import UserSettings from './pages/UserSettings'
 import Projects from './pages/Projects'
 import Board from './pages/Board'
 import TaskDrawer from './pages/TaskDrawer'
@@ -68,10 +71,13 @@ function App() {
           <Route path="/register" element={<Register />} />
         </Route>
 
+        <Route path="/invite/:token" element={<Invite />} />
+
         <Route element={<RequireAuth />}>
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
             <Route path="/workspaces/new" element={<NewWorkspace />} />
+            <Route path="/settings" element={<UserSettings />} />
 
             <Route path="/w/:workspaceId" element={<WorkspaceLayout />}>
               <Route index element={<Projects />} />
@@ -87,6 +93,8 @@ function App() {
           </Route>
         </Route>
       </Routes>
+
+      <Toaster />
     </>
   )
 }

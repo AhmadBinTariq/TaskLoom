@@ -8,6 +8,7 @@ import { useWorkspace } from '../components/WorkspaceLayout'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import Icon from '../components/Icon'
+import { EmptyState } from '../components/States'
 import './members.css'
 
 const roleHelp = {
@@ -158,7 +159,7 @@ function Members() {
       {canManage && (
         <section className="card member-panel">
           <h2>Pending invitations</h2>
-          {invitations.length === 0 && <p className="muted">No pending invitations.</p>}
+          {invitations.length === 0 && <EmptyState title="No pending invitations" />}
           {invitations.length > 0 && (
             <ul className="member-list">
               {invitations.map((inv) => (

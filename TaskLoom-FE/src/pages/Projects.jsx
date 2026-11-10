@@ -8,7 +8,7 @@ import { useWorkspace } from '../components/WorkspaceLayout'
 import PageHeader from '../components/PageHeader'
 import Modal from '../components/Modal'
 import Icon from '../components/Icon'
-import { LoadingState } from '../components/States'
+import { LoadingState, EmptyState } from '../components/States'
 import './workspaces.css'
 
 function Projects() {
@@ -41,7 +41,11 @@ function Projects() {
 
       {loading && <LoadingState label="Loading projects…" />}
 
-      {!loading && projects.length === 0 && <p className="muted">No projects yet.</p>}
+      {!loading && projects.length === 0 && (
+        <EmptyState title="No projects yet" action={canManage && <button className="btn btn--primary" onClick={() => setEditing('new')}>Create the first project</button>}>
+          {canManage ? 'Projects hold a Kanban board each. Create one to start adding tasks.' : 'An Owner or Admin needs to create a project first.'}
+        </EmptyState>
+      )}
 
       {!loading && projects.length > 0 && (
         <ul className="ws-grid">

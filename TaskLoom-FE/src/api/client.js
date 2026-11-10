@@ -55,6 +55,7 @@ export const api = {
     register: (body) => post('/auth/register', body),
     login: (body) => post('/auth/login', body),
     me: () => get('/auth/me').then(normUser),
+    updateProfile: (body) => patch('/auth/profile', body).then(normUser),
   },
   workspaces: {
     list: () => get('/workspaces'),
@@ -74,6 +75,8 @@ export const api = {
     list: (id) => get(`/workspaces/${id}/invitations`),
     create: (id, body) => post(`/workspaces/${id}/invitations`, body),
     revoke: (id, invId) => del(`/workspaces/${id}/invitations/${invId}`),
+    preview: (token) => get(`/invitations/${token}`),
+    accept: (token) => post(`/invitations/${token}/accept`),
   },
   labels: {
     list: (id) => get(`/workspaces/${id}/labels`).then((ls) => ls.map(normLabel)),
