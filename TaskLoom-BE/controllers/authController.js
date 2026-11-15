@@ -44,4 +44,20 @@ const login = async (req, res) => {
   }
 }
 
-module.exports = { register, login }
+const me = async (req, res) => {
+  res.json(shape(req.user))
+}
+
+const updateProfile = async (req, res) => {
+  try {
+    const { name, theme } = req.body
+    if (name !== undefined) req.user.name = name
+    if (theme !== undefined) req.user.theme = theme
+    await req.user.save()
+    res.json(shape(req.user))
+  } catch (error) {
+    res.status(500).json({ message: error.message })
+  }
+}
+
+module.exports = { register, login, me, updateProfile }
