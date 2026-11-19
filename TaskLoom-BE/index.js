@@ -4,6 +4,9 @@ const mongoose = require('mongoose')
 
 const authRoutes = require('./routes/authRoutes')
 const workspaceRoutes = require('./routes/workspaceRoutes')
+const invitationRoutes = require('./routes/invitationRoutes')
+const projectRoutes = require('./routes/projectRoutes')
+const columnRoutes = require('./routes/columnRoutes')
 
 const app = express()
 
@@ -20,6 +23,9 @@ app.get('/', (req, res) => {
 
 app.use('/api/auth', authRoutes)
 app.use('/api/workspaces', workspaceRoutes)
+app.use('/api/invitations', invitationRoutes)
+app.use('/api/projects', projectRoutes)
+app.use('/api/columns', columnRoutes)
 
 const PORT = process.env.PORT || 5000
 app.listen(PORT, () => {
