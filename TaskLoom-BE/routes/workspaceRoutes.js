@@ -6,6 +6,7 @@ const { listMembers, updateMemberRole, removeMember } = require('../controllers/
 const { listInvitations, createInvitation, revokeInvitation } = require('../controllers/invitationController')
 const { listLabels, createLabel, removeLabel } = require('../controllers/labelController')
 const { listProjects, createProject } = require('../controllers/projectController')
+const { searchTasks } = require('../controllers/taskController')
 
 router.use(auth)
 
@@ -30,5 +31,7 @@ router.delete('/:id/labels/:labelId', removeLabel)
 
 router.get('/:id/projects', listProjects)
 router.post('/:id/projects', createProject)
+
+router.get('/:id/search', searchTasks)
 
 module.exports = router

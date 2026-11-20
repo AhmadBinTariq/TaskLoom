@@ -7,6 +7,7 @@ const workspaceRoutes = require('./routes/workspaceRoutes')
 const invitationRoutes = require('./routes/invitationRoutes')
 const projectRoutes = require('./routes/projectRoutes')
 const columnRoutes = require('./routes/columnRoutes')
+const taskRoutes = require('./routes/taskRoutes')
 
 const app = express()
 
@@ -26,6 +27,7 @@ app.use('/api/workspaces', workspaceRoutes)
 app.use('/api/invitations', invitationRoutes)
 app.use('/api/projects', projectRoutes)
 app.use('/api/columns', columnRoutes)
+app.use('/api/tasks', taskRoutes)
 
 const PORT = process.env.PORT || 5000
 app.listen(PORT, () => {
