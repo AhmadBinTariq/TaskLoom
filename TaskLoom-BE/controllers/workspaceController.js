@@ -7,103 +7,67 @@ const Comment = require('../models/Comment')
 const Label = require('../models/Label')
 const Invitation = require('../models/Invitation')
 const Activity = require('../models/Activity')
-const { can } = require('../utils/permissions')
+const { wrapAll } = require('../utils/asyncHandler')
+const { requireText } = require('../utils/validate')
+const { permissionsFor } = require('../utils/permissions')
+
+// `permissions` lets the frontend show/hide actions using the server's own rules.
+const shape = (workspace, role) => ({
+  id: workspace._id,
+  name: workspace.name,
+  createdAt: workspace.createdAt,
+  myRole: role,
+  permissions: permissionsFor(role),
+})
 
 const listWorkspaces = async (req, res) => {
-  try {
-    const memberships = await Membership.find({ user: req.user._id }).populate('workspace')
-    const workspaces = memberships
-      .filter((m) => m.workspace)
-      .map((m) => ({ id: m.workspace._id, name: m.workspace.name, createdAt: m.workspace.createdAt, myRole: m.role }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-    res.json(workspaces)
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
+  const memberships = await Membership.find({ user: req.user._id }).populate('workspace')
+  const workspaces = memberships
+    .filter((m) => m.workspace)
+    .map((m) => shape(m.workspace, m.role))
+    .sort((a, b) => a.name.localeCompare(b.name))
+  res.json(workspaces)
 }
 
+// access('workspace', 'workspace:read') has already loaded req.workspace and req.role.
 const getWorkspace = async (req, res) => {
-  try {
-    const membership = await Membership.findOne({ workspace: req.params.id, user: req.user._id })
-    if (!membership) {
-      return res.status(403).json({ message: 'You are not a member of this workspace.' })
-    }
-    const workspace = await Workspace.findById(req.params.id)
-    if (!workspace) {
-      return res.status(404).json({ message: 'Workspace not found.' })
-    }
-    res.json({ id: workspace._id, name: workspace.name, createdAt: workspace.createdAt, myRole: membership.role })
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
+  res.json(shape(req.workspace, req.role))
 }
 
 const createWorkspace = async (req, res) => {
-  try {
-    const { name } = req.body
-    if (!name || name.trim().length < 2) {
-      return res.status(400).json({ message: 'Workspace name must be at least 2 characters.' })
-    }
-    const workspace = await Workspace.create({ name: name.trim() })
-    await Membership.create({ workspace: workspace._id, user: req.user._id, role: 'owner' })
-    res.status(201).json({ id: workspace._id, name: workspace.name, createdAt: workspace.createdAt, myRole: 'owner' })
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
+  const name = requireText(req.body.name, 'Workspace name', { min: 2, max: 50 })
+  const workspace = await Workspace.create({ name })
+  await Membership.create({ workspace: workspace._id, user: req.user._id, role: 'owner' })
+  res.status(201).json(shape(workspace, 'owner'))
 }
 
 const renameWorkspace = async (req, res) => {
-  try {
-    const membership = await Membership.findOne({ workspace: req.params.id, user: req.user._id })
-    if (!membership || !can(membership.role, 'workspace:rename')) {
-      return res.status(403).json({ message: 'You cannot rename this workspace.' })
-    }
-    const workspace = await Workspace.findByIdAndUpdate(req.params.id, { name: req.body.name }, { new: true, runValidators: true })
-    res.json({ id: workspace._id, name: workspace.name, createdAt: workspace.createdAt, myRole: membership.role })
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
+  req.workspace.name = requireText(req.body.name, 'Workspace name', { min: 2, max: 50 })
+  await req.workspace.save()
+  res.json(shape(req.workspace, req.role))
 }
 
 const deleteWorkspace = async (req, res) => {
-  try {
-    const membership = await Membership.findOne({ workspace: req.params.id, user: req.user._id })
-    if (!membership || !can(membership.role, 'workspace:delete')) {
-      return res.status(403).json({ message: 'Only the owner can delete this workspace.' })
-    }
-    const projects = await Project.find({ workspace: req.params.id })
-    const projectIds = projects.map((p) => p._id)
-    const tasks = await Task.find({ workspace: req.params.id })
-    const taskIds = tasks.map((t) => t._id)
-    await Comment.deleteMany({ task: { $in: taskIds } })
-    await Task.deleteMany({ workspace: req.params.id })
-    await Column.deleteMany({ project: { $in: projectIds } })
-    await Project.deleteMany({ workspace: req.params.id })
-    await Label.deleteMany({ workspace: req.params.id })
-    await Invitation.deleteMany({ workspace: req.params.id })
-    await Activity.deleteMany({ workspace: req.params.id })
-    await Membership.deleteMany({ workspace: req.params.id })
-    await Workspace.deleteOne({ _id: req.params.id })
-    res.json({ message: 'Workspace deleted.' })
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
+  const workspace = req.workspaceId
+  const projectIds = await Project.find({ workspace }).distinct('_id')
+  const taskIds = await Task.find({ workspace }).distinct('_id')
+  await Comment.deleteMany({ task: { $in: taskIds } })
+  await Task.deleteMany({ workspace })
+  await Column.deleteMany({ project: { $in: projectIds } })
+  await Project.deleteMany({ workspace })
+  await Label.deleteMany({ workspace })
+  await Invitation.deleteMany({ workspace })
+  await Activity.deleteMany({ workspace })
+  await Membership.deleteMany({ workspace })
+  await Workspace.deleteOne({ _id: workspace })
+  res.json({ message: 'Workspace deleted.' })
 }
 
+// The owner is blocked by the 'workspace:leave' permission on the route.
 const leaveWorkspace = async (req, res) => {
-  try {
-    const membership = await Membership.findOne({ workspace: req.params.id, user: req.user._id })
-    if (!membership) {
-      return res.status(403).json({ message: 'You are not a member of this workspace.' })
-    }
-    if (membership.role === 'owner') {
-      return res.status(400).json({ message: 'The owner cannot leave. Delete the workspace instead.' })
-    }
-    await Membership.deleteOne({ _id: membership._id })
-    res.json({ message: 'You left the workspace.' })
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
+  await Membership.deleteOne({ _id: req.membership._id })
+  await Task.updateMany({ workspace: req.workspaceId, assignee: req.user._id }, { assignee: null })
+  res.json({ message: 'You left the workspace.' })
 }
 
-module.exports = { listWorkspaces, getWorkspace, createWorkspace, renameWorkspace, deleteWorkspace, leaveWorkspace }
+module.exports = wrapAll({ listWorkspaces, getWorkspace, createWorkspace, renameWorkspace, deleteWorkspace, leaveWorkspace })

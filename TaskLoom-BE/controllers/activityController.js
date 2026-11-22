@@ -1,51 +1,18 @@
 const Activity = require('../models/Activity')
-const Task = require('../models/Task')
-const Project = require('../models/Project')
-const Membership = require('../models/Membership')
+const { wrapAll } = require('../utils/asyncHandler')
 
-const roleOf = async (workspaceId, userId) => {
-  const m = await Membership.findOne({ workspace: workspaceId, user: userId })
-  return m ? m.role : null
-}
-
+// GET /api/activity?taskId=... or ?projectId=...
+// access('activity', 'activity:read') loaded req.task or req.project and checked membership.
 const listActivity = async (req, res) => {
-  try {
-    const { projectId, taskId } = req.query
-    let filter
-    let workspaceId
-    if (taskId) {
-      const task = await Task.findById(taskId)
-      if (!task) {
-        return res.status(404).json({ message: 'Task not found.' })
-      }
-      workspaceId = task.workspace
-      filter = { task: taskId }
-    } else if (projectId) {
-      const project = await Project.findById(projectId)
-      if (!project) {
-        return res.status(404).json({ message: 'Project not found.' })
-      }
-      workspaceId = project.workspace
-      filter = { project: projectId }
-    } else {
-      return res.status(400).json({ message: 'A project or task is required.' })
-    }
-    const role = await roleOf(workspaceId, req.user._id)
-    if (!role) {
-      return res.status(403).json({ message: 'You are not a member of this workspace.' })
-    }
-    const rows = await Activity.find(filter).populate('actor').sort({ createdAt: -1 }).limit(100)
-    const result = rows.map((a) => ({
-      id: a._id,
-      type: a.type,
-      data: a.data,
-      createdAt: a.createdAt,
-      actor: a.actor ? { id: a.actor._id, name: a.actor.name, email: a.actor.email } : null,
-    }))
-    res.json(result)
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
+  const filter = req.task ? { task: req.task._id } : { project: req.project._id }
+  const rows = await Activity.find(filter).populate('actor').sort({ createdAt: -1 }).limit(100)
+  res.json(rows.map((a) => ({
+    id: a._id,
+    type: a.type,
+    data: a.data,
+    createdAt: a.createdAt,
+    actor: a.actor ? { id: a.actor._id, name: a.actor.name, email: a.actor.email } : null,
+  })))
 }
 
-module.exports = { listActivity }
+module.exports = wrapAll({ listActivity })

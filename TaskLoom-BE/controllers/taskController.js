@@ -4,33 +4,170 @@ const Project = require('../models/Project')
 const Comment = require('../models/Comment')
 const Activity = require('../models/Activity')
 const Membership = require('../models/Membership')
-const { can, canDeleteTask } = require('../utils/permissions')
+const Label = require('../models/Label')
+const { wrapAll } = require('../utils/asyncHandler')
+const { badRequest, forbidden, conflict } = require('../utils/ApiError')
+const { isId, requireId, requireText, requireOneOf, optionalDate } = require('../utils/validate')
+const { canDeleteTask, deniedMessage } = require('../utils/permissions')
 
-const roleOf = async (workspaceId, userId) => {
-  const m = await Membership.findOne({ workspace: workspaceId, user: userId })
-  return m ? m.role : null
+const PRIORITIES = ['low', 'medium', 'high']
+const FIELD_NAMES = { title: 'title', description: 'description', assignee: 'assignee', dueDate: 'due date', priority: 'priority', labels: 'labels' }
+const SEARCH_LIMIT = 50
+
+// ---------------------------------------------------------------- input checks
+
+const checkDescription = (value) => {
+  if (value === undefined || value === null) return ''
+  if (typeof value !== 'string') throw badRequest('Description must be text.')
+  if (value.length > 5000) throw badRequest('Description must be at most 5000 characters.')
+  return value
 }
 
-const todayIso = () => {
-  const d = new Date()
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+// The assignee has to be a member of the same workspace.
+const checkAssignee = async (value, workspaceId) => {
+  if (value === undefined || value === null || value === '') return null
+  const userId = requireId(String(value), 'assignee')
+  if (!(await Membership.exists({ workspace: workspaceId, user: userId }))) {
+    throw badRequest('The assignee must be a member of this workspace.')
+  }
+  return userId
 }
 
+// Labels have to belong to the same workspace.
+const checkLabels = async (value, workspaceId) => {
+  if (value === undefined || value === null) return []
+  if (!Array.isArray(value)) throw badRequest('Labels must be a list.')
+  const ids = [...new Set(value.map((id) => requireId(String(id), 'label id')))]
+  if (ids.length && (await Label.countDocuments({ _id: { $in: ids }, workspace: workspaceId })) !== ids.length) {
+    throw badRequest('One or more labels do not belong to this workspace.')
+  }
+  return ids
+}
+
+// Reads task fields from the body (accepts both `assignee`/`labels` and the
+// frontend's `assigneeId`/`labelIds`). With `partial`, only sent fields are returned.
+const readTaskInput = async (body, workspaceId, { partial }) => {
+  const sent = (key) => body[key] !== undefined
+  const assigneeRaw = sent('assignee') ? body.assignee : body.assigneeId
+  const labelsRaw = sent('labels') ? body.labels : body.labelIds
+  const input = {}
+  if (!partial || sent('title')) input.title = requireText(body.title, 'Title', { max: 120 })
+  if (!partial || sent('description')) input.description = checkDescription(body.description)
+  if (!partial || assigneeRaw !== undefined) input.assignee = await checkAssignee(assigneeRaw, workspaceId)
+  if (!partial || sent('dueDate')) input.dueDate = optionalDate(body.dueDate)
+  if (!partial || sent('priority')) input.priority = body.priority === undefined ? 'medium' : requireOneOf(body.priority, PRIORITIES, 'Priority')
+  if (!partial || labelsRaw !== undefined) input.labels = await checkLabels(labelsRaw, workspaceId)
+  return input
+}
+
+const sameValue = (key, a, b) => {
+  if (key === 'labels') return JSON.stringify((a || []).map(String)) === JSON.stringify((b || []).map(String))
+  if (key === 'assignee') return String(a || '') === String(b || '')
+  return (a ?? null) === (b ?? null)
+}
+
+const logActivity = (task, actor, type, data) =>
+  Activity.create({ workspace: task.workspace, project: task.project, task: task._id, actor, type, data })
+
+// ---------------------------------------------------------------- handlers
+
+// POST /api/projects/:id/tasks – access('project', 'task:write') loaded req.project.
+const createTask = async (req, res) => {
+  const { project } = req
+  const input = await readTaskInput(req.body, project.workspace, { partial: false })
+  const column = await Column.findOne({ _id: requireId(req.body.columnId, 'column id'), project: project._id })
+  if (!column) throw badRequest('That column does not exist in this project.')
+
+  const last = await Task.findOne({ column: column._id }).sort({ position: -1 })
+  const task = await Task.create({
+    ...input,
+    workspace: project.workspace,
+    project: project._id,
+    column: column._id,
+    position: last ? last.position + 1000 : 1000,
+    createdBy: req.user._id,
+  })
+  await logActivity(task, req.user._id, 'task.created', { title: task.title, column: column.name })
+  res.status(201).json(task)
+}
+
+// access('task', ...) loaded req.task for the handlers below.
+const getTask = async (req, res) => {
+  res.json(req.task)
+}
+
+const updateTask = async (req, res) => {
+  const { task } = req
+  const input = await readTaskInput(req.body, task.workspace, { partial: true })
+  const changed = Object.keys(input).filter((key) => !sameValue(key, task[key], input[key]))
+  if (changed.length === 0) return res.json(task)
+
+  changed.forEach((key) => { task[key] = input[key] })
+  await task.save()
+  await logActivity(task, req.user._id, 'task.updated', { title: task.title, fields: changed.map((k) => FIELD_NAMES[k]).join(', ') })
+  res.json(task)
+}
+
+// Positions are fractional: a task dropped between two others gets the midpoint, so a
+// move only ever updates the moved task. If the task it was dropped after is gone
+// (someone else changed the board), the client gets 409 and reloads.
+const moveTask = async (req, res) => {
+  const { task } = req
+  const columnId = requireId(req.body.columnId, 'column id')
+  const { afterTaskId } = req.body
+  if (afterTaskId !== null && afterTaskId !== undefined && !isId(afterTaskId)) throw badRequest('Invalid afterTaskId.')
+
+  const target = await Column.findOne({ _id: columnId, project: task.project })
+  if (!target) throw badRequest('That column does not exist in this project.')
+
+  const siblings = await Task.find({ column: columnId, _id: { $ne: task._id } }).sort({ position: 1 })
+  let position
+  if (!afterTaskId) {
+    position = siblings.length ? siblings[0].position - 1000 : 1000
+  } else {
+    const idx = siblings.findIndex((t) => String(t._id) === String(afterTaskId))
+    if (idx === -1) throw conflict('The board changed. Please refresh.')
+    const next = siblings[idx + 1]
+    position = next ? (siblings[idx].position + next.position) / 2 : siblings[idx].position + 1000
+  }
+
+  const fromColumn = String(task.column) !== columnId ? await Column.findById(task.column) : null
+  task.column = columnId
+  task.position = position
+  await task.save()
+  if (fromColumn) {
+    await logActivity(task, req.user._id, 'task.moved', { title: task.title, from: fromColumn.name, to: target.name })
+  }
+  res.json(task)
+}
+
+// Route allows 'task:delete-any' (Owner/Admin) or 'task:delete-own' (Member);
+// a Member must also be the task's creator.
+const deleteTask = async (req, res) => {
+  const { task } = req
+  if (!canDeleteTask(req.role, req.user._id, task.createdBy)) throw forbidden(deniedMessage('task:delete-any'))
+  await Comment.deleteMany({ task: task._id })
+  await Task.deleteOne({ _id: task._id })
+  await Activity.create({ workspace: task.workspace, project: task.project, actor: req.user._id, type: 'task.deleted', data: { title: task.title } })
+  res.json({ message: 'Task deleted.' })
+}
+
+// ---------------------------------------------------------------- search
+
+const pad = (n) => String(n).padStart(2, '0')
+const isoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 const addDays = (iso, days) => {
   const [y, m, d] = iso.split('-').map(Number)
-  const next = new Date(y, m - 1, d + days)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`
+  return isoDate(new Date(y, m - 1, d + days))
 }
 
 const matches = (task, f, today) => {
-  const text = (f.text || '').trim().toLowerCase()
+  const text = f.text.trim().toLowerCase()
   if (text && !task.title.toLowerCase().includes(text) && !task.description.toLowerCase().includes(text)) return false
   if (f.assigneeId === 'unassigned' && task.assignee) return false
-  if (f.assigneeId && f.assigneeId !== 'any' && f.assigneeId !== 'unassigned' && String(task.assignee) !== f.assigneeId) return false
-  if (f.labelId && f.labelId !== 'any' && !task.labels.map(String).includes(f.labelId)) return false
-  if (f.priority && f.priority !== 'any' && task.priority !== f.priority) return false
+  if (isId(f.assigneeId) && String(task.assignee) !== f.assigneeId) return false
+  if (isId(f.labelId) && !task.labels.map(String).includes(f.labelId)) return false
+  if (PRIORITIES.includes(f.priority) && task.priority !== f.priority) return false
   if (f.due === 'none') return task.dueDate === null
   if (f.due === 'overdue') return task.dueDate !== null && task.dueDate < today
   if (f.due === 'today') return task.dueDate === today
@@ -38,196 +175,25 @@ const matches = (task, f, today) => {
   return true
 }
 
-const readInput = (body) => ({
-  title: body.title,
-  description: body.description || '',
-  assignee: body.assignee !== undefined ? body.assignee : body.assigneeId ?? null,
-  dueDate: body.dueDate ?? null,
-  priority: body.priority || 'medium',
-  labels: body.labels || body.labelIds || [],
-})
-
-const createTask = async (req, res) => {
-  try {
-    const project = await Project.findById(req.params.id)
-    if (!project) {
-      return res.status(404).json({ message: 'Project not found.' })
-    }
-    const role = await roleOf(project.workspace, req.user._id)
-    if (!can(role, 'task:write')) {
-      return res.status(403).json({ message: 'You cannot create tasks.' })
-    }
-    const input = readInput(req.body)
-    if (!input.title || !input.title.trim()) {
-      return res.status(400).json({ message: 'Title is required.' })
-    }
-    const column = await Column.findById(req.body.columnId)
-    if (!column || String(column.project) !== String(project._id)) {
-      return res.status(400).json({ message: 'That column does not exist in this project.' })
-    }
-    const inColumn = await Task.find({ column: column._id })
-    const position = inColumn.length ? Math.max(...inColumn.map((t) => t.position)) + 1000 : 1000
-    const task = await Task.create({
-      workspace: project.workspace,
-      project: project._id,
-      column: column._id,
-      title: input.title.trim(),
-      description: input.description,
-      assignee: input.assignee,
-      dueDate: input.dueDate,
-      priority: input.priority,
-      labels: input.labels,
-      position,
-      createdBy: req.user._id,
-    })
-    await Activity.create({ workspace: project.workspace, project: project._id, task: task._id, actor: req.user._id, type: 'task.created', data: { title: task.title, column: column.name } })
-    res.status(201).json(task)
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
-}
-
-const getTask = async (req, res) => {
-  try {
-    const task = await Task.findById(req.params.id)
-    if (!task) {
-      return res.status(404).json({ message: 'Task not found.' })
-    }
-    const role = await roleOf(task.workspace, req.user._id)
-    if (!role) {
-      return res.status(403).json({ message: 'You are not a member of this workspace.' })
-    }
-    res.json(task)
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
-}
-
-const updateTask = async (req, res) => {
-  try {
-    const task = await Task.findById(req.params.id)
-    if (!task) {
-      return res.status(404).json({ message: 'Task not found.' })
-    }
-    const role = await roleOf(task.workspace, req.user._id)
-    if (!can(role, 'task:write')) {
-      return res.status(403).json({ message: 'You cannot edit tasks.' })
-    }
-    const input = readInput(req.body)
-    const names = { title: 'title', description: 'description', assignee: 'assignee', dueDate: 'due date', priority: 'priority', labels: 'labels' }
-    const changed = []
-    if (task.title !== input.title) changed.push('title')
-    if (task.description !== input.description) changed.push('description')
-    if (String(task.assignee || '') !== String(input.assignee || '')) changed.push('assignee')
-    if ((task.dueDate || null) !== (input.dueDate || null)) changed.push('dueDate')
-    if (task.priority !== input.priority) changed.push('priority')
-    if (JSON.stringify(task.labels.map(String)) !== JSON.stringify((input.labels || []).map(String))) changed.push('labels')
-    if (changed.length === 0) {
-      return res.json(task)
-    }
-    task.title = input.title
-    task.description = input.description
-    task.assignee = input.assignee
-    task.dueDate = input.dueDate
-    task.priority = input.priority
-    task.labels = input.labels
-    await task.save()
-    await Activity.create({ workspace: task.workspace, project: task.project, task: task._id, actor: req.user._id, type: 'task.updated', data: { title: task.title, fields: changed.map((k) => names[k]).join(', ') } })
-    res.json(task)
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
-}
-
-const moveTask = async (req, res) => {
-  try {
-    const task = await Task.findById(req.params.id)
-    if (!task) {
-      return res.status(404).json({ message: 'Task not found.' })
-    }
-    const role = await roleOf(task.workspace, req.user._id)
-    if (!can(role, 'task:write')) {
-      return res.status(403).json({ message: 'You cannot move tasks.' })
-    }
-    const { columnId, afterTaskId } = req.body
-    const target = await Column.findById(columnId)
-    if (!target || String(target.project) !== String(task.project)) {
-      return res.status(400).json({ message: 'That column does not exist in this project.' })
-    }
-    const siblings = (await Task.find({ column: columnId })).filter((t) => String(t._id) !== String(task._id)).sort((a, b) => a.position - b.position)
-    let position
-    if (!afterTaskId) {
-      position = siblings.length ? siblings[0].position - 1000 : 1000
-    } else {
-      const idx = siblings.findIndex((t) => String(t._id) === String(afterTaskId))
-      if (idx === -1) {
-        return res.status(409).json({ message: 'The board changed. Please refresh.' })
-      }
-      const next = siblings[idx + 1]
-      position = next ? (siblings[idx].position + next.position) / 2 : siblings[idx].position + 1000
-    }
-    const fromColumn = await Column.findById(task.column)
-    const changedColumn = String(task.column) !== String(columnId)
-    task.column = columnId
-    task.position = position
-    await task.save()
-    if (changedColumn) {
-      await Activity.create({ workspace: task.workspace, project: task.project, task: task._id, actor: req.user._id, type: 'task.moved', data: { title: task.title, from: fromColumn ? fromColumn.name : '', to: target.name } })
-    }
-    res.json(task)
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
-}
-
-const deleteTask = async (req, res) => {
-  try {
-    const task = await Task.findById(req.params.id)
-    if (!task) {
-      return res.status(404).json({ message: 'Task not found.' })
-    }
-    const role = await roleOf(task.workspace, req.user._id)
-    if (!canDeleteTask(role, req.user._id, task.createdBy)) {
-      return res.status(403).json({ message: 'You can only delete tasks you created.' })
-    }
-    await Comment.deleteMany({ task: task._id })
-    await Task.deleteOne({ _id: task._id })
-    await Activity.create({ workspace: task.workspace, project: task.project, actor: req.user._id, type: 'task.deleted', data: { title: task.title } })
-    res.json({ message: 'Task deleted.' })
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
-}
-
+// GET /api/workspaces/:id/search – access('workspace', 'task:read').
 const searchTasks = async (req, res) => {
-  try {
-    const role = await roleOf(req.params.id, req.user._id)
-    if (!role) {
-      return res.status(403).json({ message: 'You are not a member of this workspace.' })
-    }
-    const f = {
-      text: req.query.text || '',
-      assigneeId: req.query.assigneeId || 'any',
-      labelId: req.query.labelId || 'any',
-      priority: req.query.priority || 'any',
-      due: req.query.due || 'any',
-    }
-    const today = todayIso()
-    const tasks = await Task.find({ workspace: req.params.id }).sort({ updatedAt: -1 })
-    const projects = await Project.find({ workspace: req.params.id })
-    const columns = await Column.find({})
-    const result = tasks
-      .filter((t) => matches(t, f, today))
-      .slice(0, 50)
-      .map((task) => ({
-        task,
-        projectName: projects.find((p) => String(p._id) === String(task.project))?.name || '',
-        columnName: columns.find((c) => String(c._id) === String(task.column))?.name || '',
-      }))
-    res.json(result)
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
+  const q = (key, fallback) => (typeof req.query[key] === 'string' ? req.query[key] : fallback)
+  const filters = { text: q('text', ''), assigneeId: q('assigneeId', 'any'), labelId: q('labelId', 'any'), priority: q('priority', 'any'), due: q('due', 'any') }
+  const today = isoDate(new Date())
+
+  const tasks = await Task.find({ workspace: req.workspaceId }).sort({ updatedAt: -1 })
+  const hits = tasks.filter((t) => matches(t, filters, today)).slice(0, SEARCH_LIMIT)
+
+  const projects = await Project.find({ workspace: req.workspaceId }, 'name')
+  const columns = await Column.find({ project: { $in: projects.map((p) => p._id) } }, 'name')
+  const projectName = new Map(projects.map((p) => [String(p._id), p.name]))
+  const columnName = new Map(columns.map((c) => [String(c._id), c.name]))
+
+  res.json(hits.map((task) => ({
+    task,
+    projectName: projectName.get(String(task.project)) || '',
+    columnName: columnName.get(String(task.column)) || '',
+  })))
 }
 
-module.exports = { createTask, getTask, updateTask, moveTask, deleteTask, searchTasks }
+module.exports = wrapAll({ createTask, getTask, updateTask, moveTask, deleteTask, searchTasks })

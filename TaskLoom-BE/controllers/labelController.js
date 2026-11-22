@@ -1,54 +1,32 @@
 const Label = require('../models/Label')
 const Task = require('../models/Task')
-const Membership = require('../models/Membership')
-const { can } = require('../utils/permissions')
+const { wrapAll } = require('../utils/asyncHandler')
+const { conflict, notFound } = require('../utils/ApiError')
+const { requireId, requireText, requireOneOf, escapeRegex } = require('../utils/validate')
+
+const COLORS = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'violet', 'pink']
 
 const listLabels = async (req, res) => {
-  try {
-    const mine = await Membership.findOne({ workspace: req.params.id, user: req.user._id })
-    if (!mine) {
-      return res.status(403).json({ message: 'You are not a member of this workspace.' })
-    }
-    const labels = await Label.find({ workspace: req.params.id }).sort({ name: 1 })
-    res.json(labels)
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
+  const labels = await Label.find({ workspace: req.workspaceId }).sort({ name: 1 })
+  res.json(labels)
 }
 
 const createLabel = async (req, res) => {
-  try {
-    const { name, color } = req.body
-    const mine = await Membership.findOne({ workspace: req.params.id, user: req.user._id })
-    if (!mine || !can(mine.role, 'project:manage')) {
-      return res.status(403).json({ message: 'You cannot add labels.' })
-    }
-    if (!name || !name.trim()) {
-      return res.status(400).json({ message: 'Label name is required.' })
-    }
-    const duplicate = await Label.findOne({ workspace: req.params.id, name: new RegExp(`^${name.trim()}$`, 'i') })
-    if (duplicate) {
-      return res.status(400).json({ message: 'A label with this name already exists.' })
-    }
-    const label = await Label.create({ workspace: req.params.id, name: name.trim(), color })
-    res.status(201).json(label)
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
+  const name = requireText(req.body.name, 'Label name', { max: 24 })
+  const color = req.body.color === undefined ? 'blue' : requireOneOf(req.body.color, COLORS, 'Colour')
+  const duplicate = await Label.exists({ workspace: req.workspaceId, name: new RegExp(`^${escapeRegex(name)}$`, 'i') })
+  if (duplicate) throw conflict('A label with this name already exists.')
+  const label = await Label.create({ workspace: req.workspaceId, name, color })
+  res.status(201).json(label)
 }
 
 const removeLabel = async (req, res) => {
-  try {
-    const mine = await Membership.findOne({ workspace: req.params.id, user: req.user._id })
-    if (!mine || !can(mine.role, 'project:manage')) {
-      return res.status(403).json({ message: 'You cannot remove labels.' })
-    }
-    await Label.findByIdAndDelete(req.params.labelId)
-    await Task.updateMany({ workspace: req.params.id }, { $pull: { labels: req.params.labelId } })
-    res.json({ message: 'Label removed.' })
-  } catch (error) {
-    res.status(500).json({ message: error.message })
-  }
+  const labelId = requireId(req.params.labelId, 'label id')
+  // Scoped to this workspace so managers cannot delete another workspace's labels.
+  const label = await Label.findOneAndDelete({ _id: labelId, workspace: req.workspaceId })
+  if (!label) throw notFound('Label not found.')
+  await Task.updateMany({ workspace: req.workspaceId }, { $pull: { labels: label._id } })
+  res.json({ message: 'Label removed.' })
 }
 
-module.exports = { listLabels, createLabel, removeLabel }
+module.exports = wrapAll({ listLabels, createLabel, removeLabel })
