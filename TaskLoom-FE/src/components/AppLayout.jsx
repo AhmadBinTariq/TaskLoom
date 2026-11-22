@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, Outlet, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { api } from '../api/client'
-import { selectCurrentUser, setUser, logout } from '../features/auth/authSlice'
+import { selectCurrentUser, setUser, signOut } from '../features/auth/authSlice'
 import { applyTheme } from '../app/theme'
 import Avatar from './Avatar'
 import Icon from './Icon'
@@ -50,8 +50,8 @@ function AppLayout() {
   }
 
   const handleLogout = () => {
-    dispatch(logout())
-    navigate('/login')
+    dispatch(signOut())
+    navigate('/login', { replace: true })
   }
 
   const linkClass = ({ isActive }) => (isActive ? 'is-active' : undefined)

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 import { api } from './api/client'
-import { selectCurrentUser, selectToken, selectAuthLoading, setUser, logout } from './features/auth/authSlice'
+import { selectCurrentUser, selectToken, selectAuthLoading, selectSignedOut, setUser, logout } from './features/auth/authSlice'
 import { applyTheme } from './app/theme'
 import { LoadingState } from './components/States'
 import Toaster from './components/Toaster'
@@ -24,9 +24,13 @@ import NotFound from './pages/NotFound'
 
 function RequireAuth() {
   const user = useSelector(selectCurrentUser)
+  const signedOut = useSelector(selectSignedOut)
   const location = useLocation()
   if (!user) {
-    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />
+    // Only remember the page when access was lost (opened a link while signed out,
+    // session expired). After a deliberate sign-out, the next sign-in goes home.
+    const to = signedOut ? '/login' : `/login?next=${encodeURIComponent(location.pathname)}`
+    return <Navigate to={to} replace />
   }
   return <Outlet />
 }
